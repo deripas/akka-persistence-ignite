@@ -17,7 +17,6 @@ public class IgniteExtensionImpl implements Extension {
     private Ignite ignite;
 
     public IgniteExtensionImpl(String configXml) {
-        // todo apply configure file
-        ignite = Ignition.start();
+        ignite = Ignition.start(configXml);
     }
 }

@@ -12,21 +12,16 @@ import akka.serialization.Serializer;
 import com.typesafe.config.Config;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ignite.Ignite;
-import org.apache.ignite.IgniteCache;
-import org.apache.ignite.cache.CacheMode;
-import org.apache.ignite.cache.query.SqlFieldsQuery;
-import org.apache.ignite.cache.query.SqlQuery;
-import org.apache.ignite.configuration.CacheConfiguration;
 import scala.collection.JavaConverters;
 import scala.concurrent.ExecutionContextExecutor;
 import scala.concurrent.Future;
 
-import javax.cache.Cache;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 /**
@@ -37,38 +32,27 @@ public class IgniteWriteJournal extends AsyncWriteJournal {
 
     public static final String CACHE_PREFIX_PROPERTY = "cache-prefix";
 
-    private final Serializer serializer;
-    private final Ignite ignite;
-    private final String cachePrefix;
-
+    private final JournalItemCache journalItemCache;
     private final ExecutionContextExecutor contextExecutor;
+    private final Serializer serializer;
 
     public IgniteWriteJournal(Config config) {
+        Ignite ignite = IgniteExtension.EXTENSION.get(context().system()).getIgnite();
+        String cachePrefix = config.getString(CACHE_PREFIX_PROPERTY);
+        journalItemCache = new JournalItemCache(ignite, cachePrefix);
+
         serializer = SerializationExtension.get(context().system()).serializerFor(PersistentRepr.class);
-        ignite = IgniteExtension.EXTENSION.get(context().system()).getIgnite();
-        cachePrefix = config.getString(CACHE_PREFIX_PROPERTY);
 
         //todo fix multi-treading
         contextExecutor = ExecutionContexts.fromExecutor(Executors.newSingleThreadExecutor());
-    }
-
-    private IgniteCache<Long, JournalItem> getMapByPersistenceId(String persistenceId) {
-        CacheConfiguration<Long, JournalItem> cfg = new CacheConfiguration<>(cachePrefix + persistenceId);
-        // todo need configure
-        cfg.setCacheMode(CacheMode.PARTITIONED);
-        cfg.setIndexedTypes(Long.class, JournalItem.class);
-        return ignite.getOrCreateCache(cfg);
     }
 
     @Override
     public Future<Void> doAsyncReplayMessages(String persistenceId, long fromSequenceNr, long toSequenceNr, long max, Consumer<PersistentRepr> replayCallback) {
         return Futures.future(() -> {
             log.debug("doAsyncReplayMessages '{}' {} {}", persistenceId, fromSequenceNr, toSequenceNr);
-            IgniteCache<Long, JournalItem> cache = getMapByPersistenceId(persistenceId);
-            List<Cache.Entry<Long, JournalItem>> items = cache
-                    .query(new SqlQuery<Long, JournalItem>(JournalItem.class, "sequenceNr >= ? AND sequenceNr <= ?").setArgs(fromSequenceNr, toSequenceNr))
-                    .getAll();
-            items.forEach(item -> replayCallback.accept(convert(item.getValue())));
+            List<JournalItem> items = journalItemCache.get(persistenceId, fromSequenceNr, toSequenceNr);
+            items.forEach(item -> replayCallback.accept(convert(item)));
             return null;
         }, contextExecutor);
     }
@@ -76,11 +60,7 @@ public class IgniteWriteJournal extends AsyncWriteJournal {
     @Override
     public Future<Long> doAsyncReadHighestSequenceNr(String persistenceId, long fromSequenceNr) {
         return Futures.future(() -> {
-            IgniteCache<Long, JournalItem> cache = getMapByPersistenceId(persistenceId);
-            List<List<?>> seq = cache
-                    .query(new SqlFieldsQuery("select max(sequenceNr) from JournalItem where sequenceNr > ?").setArgs(fromSequenceNr))
-                    .getAll();
-            long highestSequenceNr = listsToStreamLong(seq).findFirst().orElse(fromSequenceNr);
+            long highestSequenceNr = journalItemCache.getMaxSequenceNr(persistenceId, fromSequenceNr);
             log.debug("doAsyncReadHighestSequenceNr '{}' {} -> {}", persistenceId, fromSequenceNr, highestSequenceNr);
             return highestSequenceNr;
         }, contextExecutor);
@@ -95,9 +75,10 @@ public class IgniteWriteJournal extends AsyncWriteJournal {
 
     private Optional<Exception> writeBatch(AtomicWrite atomicWrite) {
         try {
-            Map<Long, JournalItem> batch = JavaConverters.seqAsJavaListConverter(atomicWrite.payload()).asJava().stream()
-                    .collect(Collectors.toMap(PersistentRepr::sequenceNr, this::convert));
-            getMapByPersistenceId(atomicWrite.persistenceId()).putAll(batch);
+            List<JournalItem> batch = JavaConverters.seqAsJavaListConverter(atomicWrite.payload()).asJava().stream()
+                    .map(this::convert)
+                    .collect(Collectors.toList());
+            journalItemCache.put(atomicWrite.persistenceId(), batch);
             log.debug("doAsyncWriteMessages '{}': {}", atomicWrite.persistenceId(), batch);
             return Optional.empty();
         } catch (Exception e) {
@@ -110,19 +91,10 @@ public class IgniteWriteJournal extends AsyncWriteJournal {
     public Future<Void> doAsyncDeleteMessagesTo(String persistenceId, long toSequenceNr) {
         return Futures.future(() -> {
             log.debug("doAsyncDeleteMessagesTo '{}' {}", persistenceId, toSequenceNr);
-            IgniteCache<Long, JournalItem> cache = getMapByPersistenceId(persistenceId);
-            List<List<?>> seq = cache
-                    .query(new SqlFieldsQuery("select sequenceNr from JournalItem where sequenceNr <= ?").setArgs(toSequenceNr))
-                    .getAll();
-            Set<Long> keys = listsToStreamLong(seq).collect(Collectors.toSet());
+            Set<Long> keys = journalItemCache.removeTo(persistenceId, toSequenceNr);
             log.debug("remove keys {}", keys);
-            cache.removeAll(keys);
             return null;
         }, contextExecutor);
-    }
-
-    private Stream<Long> listsToStreamLong(List<List<?>> list) {
-        return list.stream().flatMap(Collection::stream).filter(o -> o instanceof Long).map(o -> (Long) o);
     }
 
     private JournalItem convert(PersistentRepr p) {
