@@ -2,11 +2,11 @@ package akka.persistence.ignite.snapshot;
 
 import akka.dispatch.ExecutionContexts;
 import akka.dispatch.Futures;
-import akka.persistence.PersistentRepr;
 import akka.persistence.SelectedSnapshot;
 import akka.persistence.SnapshotMetadata;
 import akka.persistence.SnapshotSelectionCriteria;
 import akka.persistence.ignite.extension.IgniteExtension;
+import akka.persistence.serialization.Snapshot;
 import akka.persistence.snapshot.japi.SnapshotStore;
 import akka.serialization.SerializationExtension;
 import akka.serialization.Serializer;
@@ -37,8 +37,7 @@ public class IgniteSnapshotStore extends SnapshotStore {
         String cachePrefix = config.getString(CACHE_PREFIX_PROPERTY);
         snapshotItemCache = new SnapshotItemCache(ignite, cachePrefix);
 
-        // todo fix, serializer as in IgniteWriteJournal
-        serializer = SerializationExtension.get(context().system()).serializerFor(PersistentRepr.class);
+        serializer = SerializationExtension.get(context().system()).serializerFor(Snapshot.class);
 
         //todo fix multi-treading
         contextExecutor = ExecutionContexts.fromExecutor(Executors.newSingleThreadExecutor());
@@ -83,7 +82,7 @@ public class IgniteSnapshotStore extends SnapshotStore {
 
 
     private SnapshotItem convert(SnapshotMetadata metadata, Object snapshot) {
-        return new SnapshotItem(metadata.sequenceNr(), metadata.timestamp(), serializer.toBinary(snapshot));
+        return new SnapshotItem(metadata.sequenceNr(), metadata.timestamp(), serializer.toBinary(new Snapshot(snapshot)));
     }
 
     private SelectedSnapshot convert(String persistenceId, SnapshotItem item) {
@@ -91,6 +90,7 @@ public class IgniteSnapshotStore extends SnapshotStore {
             return null;
         }
         SnapshotMetadata metadata = new SnapshotMetadata(persistenceId, item.getSequenceNr(), item.getTimestamp());
-        return SelectedSnapshot.create(metadata, serializer.fromBinary(item.getPayload()));
+        Snapshot snapshot = (Snapshot) serializer.fromBinary(item.getPayload());
+        return SelectedSnapshot.create(metadata, snapshot.data());
     }
 }
