@@ -17,6 +17,6 @@ import java.io.Serializable;
 @AllArgsConstructor
 public class JournalItem implements Serializable {
     @QuerySqlField(index = true)
-    private Long sequenceNr;
+    private long sequenceNr;
     private byte[] payload;
 }

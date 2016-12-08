@@ -17,8 +17,8 @@ import java.io.Serializable;
 @AllArgsConstructor
 public class SnapshotItem implements Serializable {
     @QuerySqlField(index = true, descending = true)
-    private Long sequenceNr;
+    private long sequenceNr;
     @QuerySqlField(index = true, descending = true)
-    private Long timestamp;
+    private long timestamp;
     private byte[] payload;
 }
