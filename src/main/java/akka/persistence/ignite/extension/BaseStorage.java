@@ -1,5 +1,6 @@
 package akka.persistence.ignite.extension;
 
+import akka.actor.ActorRef;
 import akka.dispatch.MessageDispatcher;
 import akka.pattern.Patterns;
 import akka.persistence.ignite.executor.WorkerActorTask;
@@ -25,13 +26,13 @@ public class BaseStorage<V> {
     private static final String EXEC_TIMEOUT_PROPERTY = "execute-timeout";
 
     private final LoadingCache<String, IgniteCache<Long, V>> cache;
-    private final IgniteExtensionImpl extension;
+    private final ActorRef worker;
     private final MessageDispatcher dispatcher;
     private final String cachePrefix;
     private final long timeout;
 
     public BaseStorage(Config config, IgniteExtensionImpl extension, Class<V> valueClass) {
-        this.extension = extension;
+        worker = extension.getWorkerPool();
         dispatcher = extension.getMessageDispatcher();
         cachePrefix = config.getString(CACHE_PREFIX_PROPERTY);
         timeout = config.getLong(EXEC_TIMEOUT_PROPERTY);
@@ -48,7 +49,7 @@ public class BaseStorage<V> {
     }
 
     public <R> Future<R> execute(String key, Function<IgniteCache<Long, V>, R> function) {
-        return Patterns.ask(extension.getWorkerPool(), new WorkerActorTask(key) {
+        return Patterns.ask(worker, new WorkerActorTask(key) {
             @Override
             public Optional<R> call() throws Exception {
                 R result = function.apply(cache.get(key));

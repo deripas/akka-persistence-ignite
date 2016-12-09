@@ -39,5 +39,10 @@ public class IgniteExtensionImpl implements Extension {
                 .withDispatcher(dispatcher)
                 .props(Props.create(WorkerActor.class)), "journal-pool");
         messageDispatcher = system.dispatchers().lookup(dispatcher);
+
+        system.registerOnTermination(() -> {
+            log.info("terminate");
+            ignite.close();
+        });
     }
 }
