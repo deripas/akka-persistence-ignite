@@ -17,5 +17,19 @@
                 </property>
             </bean>
         </property>
+        <property name="cacheConfiguration">
+            <list>
+                <bean class="org.apache.ignite.configuration.CacheConfiguration">
+                    <property name="name" value="default-storage"/>
+                    <property name="cacheMode" value="PARTITIONED"/>
+                    <property name="memoryMode" value="ONHEAP_TIERED"/>
+                    <property name="backups" value="1"/>
+                    <property name="readFromBackup" value="true"/>
+                    <property name="copyOnRead" value="false"/>
+                    <property name="swapEnabled" value="false"/>
+                </bean>
+            </list>
+        </property>
     </bean>
 </beans>
+

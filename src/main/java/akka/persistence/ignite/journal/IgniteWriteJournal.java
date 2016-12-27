@@ -3,12 +3,9 @@ package akka.persistence.ignite.journal;
 
 import akka.actor.ActorSystem;
 import akka.dispatch.Futures;
-import akka.dispatch.MessageDispatcher;
 import akka.persistence.AtomicWrite;
 import akka.persistence.PersistentRepr;
 import akka.persistence.ignite.extension.BaseStorage;
-import akka.persistence.ignite.extension.IgniteExtension;
-import akka.persistence.ignite.extension.IgniteExtensionImpl;
 import akka.persistence.journal.japi.AsyncWriteJournal;
 import akka.serialization.SerializationExtension;
 import akka.serialization.Serializer;
@@ -35,14 +32,11 @@ public class IgniteWriteJournal extends AsyncWriteJournal {
 
     private final Serializer serializer;
     private final BaseStorage<JournalItem> storage;
-    private final MessageDispatcher dispatcher;
 
     public IgniteWriteJournal(Config config) {
         ActorSystem actorSystem = context().system();
-        IgniteExtensionImpl extension = IgniteExtension.EXTENSION.get(actorSystem);
         serializer = SerializationExtension.get(actorSystem).serializerFor(PersistentRepr.class);
-        storage = new BaseStorage<>(config, extension, JournalItem.class);
-        dispatcher = extension.getMessageDispatcher();
+        storage = new BaseStorage<>(config, actorSystem, JournalItem.class);
     }
 
     @Override
@@ -78,7 +72,7 @@ public class IgniteWriteJournal extends AsyncWriteJournal {
         return Futures.sequence(
                 StreamSupport.stream(messages.spliterator(), false)
                         .map(this::writeBatch)
-                        .collect(Collectors.toList()), dispatcher
+                        .collect(Collectors.toList()), storage.getDispatcher()
         );
     }
 

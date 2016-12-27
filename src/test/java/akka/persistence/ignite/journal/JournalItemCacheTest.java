@@ -4,7 +4,7 @@ import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
 import akka.pattern.Patterns;
-import akka.persistence.ignite.extension.IgniteExtension;
+import akka.persistence.ignite.extension.IgniteExtensionProvider;
 import com.typesafe.config.ConfigFactory;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
@@ -12,7 +12,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import scala.compat.java8.JFunction1;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
@@ -30,7 +29,7 @@ public class JournalItemCacheTest {
     @BeforeClass
     public void init() {
         actorSystem = ActorSystem.create("test", ConfigFactory.parseResources("test.conf"));
-        ignite = IgniteExtension.EXTENSION.get(actorSystem).getIgnite();
+        ignite = IgniteExtensionProvider.EXTENSION.get(actorSystem).getIgnite();
     }
 
     @AfterClass
@@ -44,6 +43,7 @@ public class JournalItemCacheTest {
         actorRef.tell("+a", ActorRef.noSender());
         actorRef.tell("+b", ActorRef.noSender());
         actorRef.tell("+c", ActorRef.noSender());
+        Thread.sleep(1000);
         actorRef.tell("throw", ActorRef.noSender());
 
         Future<Object> future = Patterns.ask(actorRef, "-b", 1000);
@@ -51,6 +51,10 @@ public class JournalItemCacheTest {
 
         IgniteCache<Object, Object> cache = ignite.getOrCreateCache("akka-journal-1");
         Assert.assertEquals(cache.size(), 4);
+
+        actorSystem.actorSelection("akka://test/user/**").tell("!!!", ActorRef.noSender());
+
+        Await.result(actorSystem.terminate(), Duration.create(1, TimeUnit.SECONDS));;
     }
 
 }

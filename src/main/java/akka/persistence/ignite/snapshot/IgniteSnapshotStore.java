@@ -5,7 +5,6 @@ import akka.persistence.SelectedSnapshot;
 import akka.persistence.SnapshotMetadata;
 import akka.persistence.SnapshotSelectionCriteria;
 import akka.persistence.ignite.extension.BaseStorage;
-import akka.persistence.ignite.extension.IgniteExtension;
 import akka.persistence.serialization.Snapshot;
 import akka.persistence.snapshot.japi.SnapshotStore;
 import akka.serialization.SerializationExtension;
@@ -33,7 +32,7 @@ public class IgniteSnapshotStore extends SnapshotStore {
     public IgniteSnapshotStore(Config config) {
         ActorSystem actorSystem = context().system();
         serializer = SerializationExtension.get(actorSystem).serializerFor(Snapshot.class);
-        storage = new BaseStorage<>(config, IgniteExtension.EXTENSION.get(actorSystem), SnapshotItem.class);
+        storage = new BaseStorage<>(config, actorSystem, SnapshotItem.class);
     }
 
     @Override

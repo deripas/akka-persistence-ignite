@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <akka.version>2.4.9</akka.version>
+        <akka.version>2.4.16</akka.version>
         <ignite.version>1.7.0</ignite.version>
         <slf4j.version>1.7.18</slf4j.version>
         <lombok.version>1.16.8</lombok.version>

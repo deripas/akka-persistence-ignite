@@ -11,5 +11,5 @@ akka.persistence.snapshot-store.plugin = "akka.persistence.snapshot.ignite"
 
 Configure Ignite if need, default configured on localhost. 
 ````buildoutcfg
-akka.persistence.ignite.config-file = "ignite-config.xml"
+ignite.config-file = "ignite-config.xml"
 ````

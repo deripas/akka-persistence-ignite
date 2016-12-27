@@ -1,21 +1,18 @@
 package akka.persistence.ignite.extension;
 
-import akka.actor.ActorRef;
-import akka.dispatch.MessageDispatcher;
-import akka.pattern.Patterns;
-import akka.persistence.ignite.executor.WorkerActorTask;
+import akka.actor.ActorSystem;
+import akka.dispatch.Futures;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.typesafe.config.Config;
+import lombok.Getter;
 import org.apache.ignite.IgniteCache;
-import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.configuration.CacheConfiguration;
-import scala.compat.java8.JFunction1;
+import scala.concurrent.ExecutionContextExecutor;
 import scala.concurrent.Future;
 
 import javax.annotation.Nonnull;
-import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -23,41 +20,44 @@ import java.util.function.Function;
  */
 public class BaseStorage<V> {
     private static final String CACHE_PREFIX_PROPERTY = "cache-prefix";
-    private static final String EXEC_TIMEOUT_PROPERTY = "execute-timeout";
+    private static final String DEFAULT_STORAGE = "default-storage";
 
+    @Getter
+    private final ExecutionContextExecutor dispatcher;
     private final LoadingCache<String, IgniteCache<Long, V>> cache;
-    private final ActorRef worker;
-    private final MessageDispatcher dispatcher;
     private final String cachePrefix;
-    private final long timeout;
 
-    public BaseStorage(Config config, IgniteExtensionImpl extension, Class<V> valueClass) {
-        worker = extension.getWorkerPool();
-        dispatcher = extension.getMessageDispatcher();
+    public BaseStorage(Config config, ActorSystem actorSystem, Class<V> valueClass) {
+        IgniteExtension extension = IgniteExtensionProvider.EXTENSION.get(actorSystem);
+        dispatcher = extension.getDispatcher();
         cachePrefix = config.getString(CACHE_PREFIX_PROPERTY);
-        timeout = config.getLong(EXEC_TIMEOUT_PROPERTY);
+        CacheConfiguration defaultConfig = findDefaultConfig(extension.getIgnite().configuration().getCacheConfiguration(), DEFAULT_STORAGE);
         cache = CacheBuilder.newBuilder().build(new CacheLoader<String, IgniteCache<Long, V>>() {
             @Override
             public IgniteCache<Long, V> load(@Nonnull String key) throws Exception {
-                CacheConfiguration<Long, V> cfg = new CacheConfiguration<>(cachePrefix + key);
-                // todo need configure
-                cfg.setCacheMode(CacheMode.PARTITIONED);
+                CacheConfiguration<Long, V> cfg = create(defaultConfig);
+                cfg.setName(cachePrefix + key);
                 cfg.setIndexedTypes(Long.class, valueClass);
                 return extension.getIgnite().getOrCreateCache(cfg);
             }
         });
     }
 
-    public <R> Future<R> execute(String key, Function<IgniteCache<Long, V>, R> function) {
-        return Patterns.ask(worker, new WorkerActorTask(key) {
-            @Override
-            public Optional<R> call() throws Exception {
-                R result = function.apply(cache.get(key));
-                return Optional.ofNullable(result);
+    @SuppressWarnings("unchecked")
+    private CacheConfiguration<Long, V> create(CacheConfiguration defaultConfig) {
+        return new CacheConfiguration<>(defaultConfig);
+    }
+
+    private CacheConfiguration findDefaultConfig(CacheConfiguration[] configurations, String name) {
+        for (CacheConfiguration configuration : configurations) {
+            if (configuration.getName().equals(name)) {
+                return configuration;
             }
-        }, timeout).map((JFunction1<Object, R>) o -> {
-            Optional<R> optional = (Optional<R>) o;
-            return optional.orElse(null);
-        }, dispatcher);
+        }
+        return new CacheConfiguration();
+    }
+
+    public <R> Future<R> execute(String key, Function<IgniteCache<Long, V>, R> function) {
+        return Futures.future(() -> function.apply(cache.get(key)), dispatcher);
     }
 }
