@@ -43,7 +43,7 @@ public class JournalItemCacheTest {
         actorRef.tell("+a", ActorRef.noSender());
         actorRef.tell("+b", ActorRef.noSender());
         actorRef.tell("+c", ActorRef.noSender());
-        Thread.sleep(1000);
+//        Thread.sleep(1000);
         actorRef.tell("throw", ActorRef.noSender());
 
         Future<Object> future = Patterns.ask(actorRef, "-b", 1000);
