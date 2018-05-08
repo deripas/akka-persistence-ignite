@@ -12,8 +12,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <akka.version>2.4.16</akka.version>
-        <ignite.version>1.7.0</ignite.version>
+        <akka.version>2.5.12</akka.version>
+        <ignite.version>2.4.0</ignite.version>
         <slf4j.version>1.7.18</slf4j.version>
         <lombok.version>1.16.8</lombok.version>
     </properties>
@@ -47,8 +47,13 @@
         <!--Akka-->
         <dependency>
             <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-persistence_2.11</artifactId>
+            <artifactId>akka-persistence_2.12</artifactId>
             <version>${akka.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-java8-compat_2.12</artifactId>
+            <version>0.9.0</version>
         </dependency>
 
         <!--Ignite-->
@@ -88,11 +93,12 @@
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <version>3.0.1</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>20.0</version>
+            <version>23.0</version>
         </dependency>
 
 
@@ -112,13 +118,13 @@
 
         <dependency>
             <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-cluster_2.11</artifactId>
+            <artifactId>akka-cluster_2.12</artifactId>
             <version>${akka.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.typesafe.akka</groupId>
-            <artifactId>akka-cluster-tools_2.11</artifactId>
+            <artifactId>akka-cluster-tools_2.12</artifactId>
             <version>${akka.version}</version>
             <scope>test</scope>
         </dependency>

@@ -14,7 +14,7 @@ import java.util.function.Function;
 @Slf4j
 public class IgniteFactoryByConfigXml implements Function<ExtendedActorSystem, Ignite> {
 
-    public static final String CONFIG = "ignite.config-file";
+    public static final String CONFIG = "ignite-config.file";
 
     @Override
     public Ignite apply(ExtendedActorSystem system) {

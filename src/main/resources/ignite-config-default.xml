@@ -20,13 +20,26 @@
         <property name="cacheConfiguration">
             <list>
                 <bean class="org.apache.ignite.configuration.CacheConfiguration">
-                    <property name="name" value="default-storage"/>
+                    <property name="name" value="ignite-journal-storage"/>
                     <property name="cacheMode" value="PARTITIONED"/>
-                    <property name="memoryMode" value="ONHEAP_TIERED"/>
                     <property name="backups" value="1"/>
-                    <property name="readFromBackup" value="true"/>
-                    <property name="copyOnRead" value="false"/>
-                    <property name="swapEnabled" value="false"/>
+                    <property name="indexedTypes">
+                        <list>
+                            <value>akka.persistence.ignite.Key</value>
+                            <value>akka.persistence.ignite.journal.JournalItem</value>
+                        </list>
+                    </property>
+                </bean>
+                <bean class="org.apache.ignite.configuration.CacheConfiguration">
+                    <property name="name" value="ignite-snapshot-storage"/>
+                    <property name="cacheMode" value="PARTITIONED"/>
+                    <property name="backups" value="1"/>
+                    <property name="indexedTypes">
+                        <list>
+                            <value>akka.persistence.ignite.Key</value>
+                            <value>akka.persistence.ignite.snapshot.SnapshotItem</value>
+                        </list>
+                    </property>
                 </bean>
             </list>
         </property>
